@@ -88,9 +88,12 @@ pub fn main() !void {
     var list = try std.ArrayList(u8).init(allocator);
     defer list.deinit(allocator); // managed by arena
 
-    const val = json.JsonValue{ .String = "Hello World" };
-    
-    std.debug.print("JSON: {f}\n", .{list.items});
+     std.debug.print("JSON: {f}\n", .{val});
+ 
+     // Write to any std.io.Writer
+     try json.stringify(val, list.writer(allocator));
+ 
+     std.debug.print("JSON: {s}\n", .{list.items});
 }
 ```
 
