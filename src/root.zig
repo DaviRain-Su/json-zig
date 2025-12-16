@@ -52,7 +52,54 @@ pub const JsonValue = union(JsonType) {
         var parser = Parser.init(allocator, lexer);
         return parser.parseJson();
     }
+
+    pub fn stringify(self: JsonValue, writer: anytype) !void {
+        switch (self) {
+            .Null => try writer.writeAll("null"),
+            .Bool => |b| try writer.writeAll(if (b) "true" else "false"),
+            .Number => |n| try writer.print("{d}", .{n}),
+            .String => |s| try writeEscapedString(writer, s),
+            .Array => |items| {
+                try writer.writeByte('[');
+                for (items, 0..) |item, i| {
+                    if (i > 0) try writer.writeByte(',');
+                    try item.stringify(writer);
+                }
+                try writer.writeByte(']');
+            },
+            .Object => |map| {
+                try writer.writeByte('{');
+                var it = map.iterator();
+                var i: usize = 0;
+                while (it.next()) |entry| {
+                    if (i > 0) try writer.writeByte(',');
+                    try writeEscapedString(writer, entry.key_ptr.*);
+                    try writer.writeByte(':');
+                    try entry.value_ptr.stringify(writer);
+                    i += 1;
+                }
+                try writer.writeByte('}');
+            },
+        }
+    }
 };
+
+fn writeEscapedString(writer: anytype, s: []const u8) !void {
+    try writer.writeByte('"');
+    for (s) |c| {
+        switch (c) {
+            '"' => try writer.writeAll("\\\""),
+            '\\' => try writer.writeAll("\\\\"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            0x08 => try writer.writeAll("\\b"),
+            0x0c => try writer.writeAll("\\f"),
+            else => try writer.writeByte(c),
+        }
+    }
+    try writer.writeByte('"');
+}
 
 const Parser = struct {
     lexer: Lexer,
