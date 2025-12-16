@@ -73,6 +73,13 @@ pub const JsonValue = union(enum) {
             },
         }
     }
+
+    pub fn format(
+        self: JsonValue,
+        writer: anytype,
+    ) !void {
+        try self.stringify(writer);
+    }
 };
 
 /// High-level API to parse a JSON string.
