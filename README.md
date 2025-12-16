@@ -52,16 +52,16 @@ pub fn main() !void {
     const allocator = arena.allocator();
 
     const input =
-        \{
-        \  "name": "Zig",
-        \  "version": 0.11,
-        \  "features": ["fast", "safe"]
-        \}
+        \\{
+        \\  "name": "Zig",
+        \\  "version": 0.11,
+        \\  "features": ["fast", "safe"]
+        \\}
     ;
 
     // Parse the JSON string
     // Note: It uses the allocator for internal structures (arrays, hashmaps).
-    var root = try json.parse(allocator, input);
+    const root = try json.parse(allocator, input);
     // You can call root.deinit(allocator) if not using an ArenaAllocator,
     // but Arena is recommended for easier cleanup.
     
@@ -85,15 +85,12 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    var list = std.ArrayList(u8).init(allocator);
-    // defer list.deinit(); // managed by arena
+    var list = try std.ArrayList(u8).init(allocator);
+    defer list.deinit(allocator); // managed by arena
 
     const val = json.JsonValue{ .String = "Hello World" };
     
-    // Write to any std.io.Writer
-    try json.stringify(val, list.writer(allocator));
-    
-    std.debug.print("JSON: {s}\n", .{list.items});
+    std.debug.print("JSON: {f}\n", .{list.items});
 }
 ```
 
