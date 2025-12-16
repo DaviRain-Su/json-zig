@@ -11,16 +11,7 @@ pub const ParseError = error{
     InvalidCharacter,
 };
 
-pub const JsonType = enum {
-    Null,
-    Bool,
-    Number,
-    String,
-    Array,
-    Object,
-};
-
-pub const JsonValue = union(JsonType) {
+pub const JsonValue = union(enum) {
     Null: void,
     Bool: bool,
     Number: f64,
@@ -83,6 +74,25 @@ pub const JsonValue = union(JsonType) {
         }
     }
 };
+
+/// High-level API to parse a JSON string.
+pub fn parse(allocator: std.mem.Allocator, input: []const u8) ParseError!JsonValue {
+    return JsonValue.parse(allocator, input);
+}
+
+/// High-level API to stringify a JsonValue to a writer.
+pub fn stringify(value: JsonValue, writer: anytype) !void {
+    return value.stringify(writer);
+}
+
+/// High-level API to stringify a JsonValue to a newly allocated string.
+/// Caller owns the returned string.
+pub fn stringifyAlloc(allocator: std.mem.Allocator, value: JsonValue) ![]u8 {
+    var list = std.ArrayList(u8).initCapacity(allocator, 0) catch return error.OutOfMemory;
+    errdefer list.deinit(allocator);
+    try stringify(value, list.writer(allocator));
+    return list.toOwnedSlice(allocator);
+}
 
 fn writeEscapedString(writer: anytype, s: []const u8) !void {
     try writer.writeByte('"');
@@ -444,7 +454,7 @@ test "Parser test" {
         "  \"array\": [1, 2, 3]\n" ++
         "}";
 
-    var val = try JsonValue.parse(std.testing.allocator, input);
+    var val = try parse(std.testing.allocator, input);
     defer val.deinit(std.testing.allocator);
 
     try testing.expect(val == .Object);
@@ -459,4 +469,51 @@ test "Parser test" {
     try testing.expectEqual(1.0, arr[0].Number);
     try testing.expectEqual(2.0, arr[1].Number);
     try testing.expectEqual(3.0, arr[2].Number);
+}
+
+test "stringify test" {
+    const allocator = testing.allocator;
+
+    var obj = std.StringArrayHashMap(JsonValue).init(allocator);
+
+    try obj.put("name", JsonValue{ .String = "Zig" });
+    try obj.put("awesome", JsonValue{ .Bool = true });
+    try obj.put("version", JsonValue{ .Number = 0.11 });
+
+    var arr_list = std.ArrayList(JsonValue).initCapacity(allocator, 3) catch unreachable;
+    defer arr_list.deinit(allocator);
+    try arr_list.append(allocator, JsonValue{ .Number = 1 });
+    try arr_list.append(allocator, JsonValue{ .Number = 2 });
+    try arr_list.append(allocator, JsonValue{ .Number = 3 });
+
+    try obj.put("list", JsonValue{ .Array = try arr_list.toOwnedSlice(allocator) });
+
+    var root = JsonValue{ .Object = obj };
+    defer root.deinit(allocator);
+
+    var list = std.ArrayList(u8).initCapacity(allocator, 0) catch unreachable;
+    defer list.deinit(allocator);
+
+    try stringify(root, list.writer(allocator));
+
+    const expected = "{\"name\":\"Zig\",\"awesome\":true,\"version\":0.11,\"list\":[1,2,3]}";
+    try testing.expectEqualStrings(expected, list.items);
+}
+
+test "stringify escaping" {
+    var list = std.ArrayList(u8).initCapacity(testing.allocator, 0) catch unreachable;
+    defer list.deinit(testing.allocator);
+
+    const val = JsonValue{ .String = "Hello\n\t\"World\"" };
+    try val.stringify(list.writer(testing.allocator));
+
+    try testing.expectEqualStrings("\"Hello\\n\\t\\\"World\\\"\"", list.items);
+}
+
+test "stringifyAlloc test" {
+    const allocator = testing.allocator;
+    const val = JsonValue{ .String = "test" };
+    const s = try stringifyAlloc(allocator, val);
+    defer allocator.free(s);
+    try testing.expectEqualStrings("\"test\"", s);
 }
