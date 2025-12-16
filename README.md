@@ -16,7 +16,7 @@ A simple, zero-dependency JSON parser and stringifier for Zig.
 Run the following command to fetch the package and add it to your `build.zig.zon`:
 
 ```bash
-zig fetch --save git+https://github.com/davirain/json-zig.git
+zig fetch --save git+https://github.com/DaviRain-Su/json-zig.git
 ```
 
 (Replace the URL with the actual repository URL if different).
